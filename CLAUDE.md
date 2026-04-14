@@ -16,7 +16,7 @@ All communication within this project is conducted in **Russian**, unless explic
 
 - **TypeScript** + Node.js (`"type": "module"`)
 - **`@modelcontextprotocol/sdk`** — MCP SDK
-- AppleScript-скрипты вызываются через `osascript` (child_process)
+- **JXA** (JavaScript for Automation) скрипты вызываются через `osascript -l JavaScript` (child_process) — используется вместо `.applescript` ради нативного `JSON.stringify` и передачи параметров через `argv`
 
 ## Development Commands
 
@@ -40,7 +40,7 @@ src/
 │                            #   mark_email, delete_email, archive_email
 └── applescript/
     ├── runner.ts            # запуск osascript, парсинг JSON, обработка ошибок
-    └── scripts/             # по одному .applescript-файлу на операцию
+    └── scripts/             # JXA (.js) скрипты — по одному файлу на операцию
 ```
 
 ### Ключевые соглашения
