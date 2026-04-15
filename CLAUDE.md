@@ -8,7 +8,7 @@ All communication within this project is conducted in **Russian**, unless explic
 
 ## Project Overview
 
-`apple-mailapp-mcp` — MCP-сервер на TypeScript/Node.js, который предоставляет AI-ассистентам инструменты для работы с Apple Mail на macOS. Взаимодействие с Mail.app — через AppleScript (`osascript`). Транспорт — stdio.
+`apple-mailapp-mcp` — MCP-сервер на TypeScript/Node.js, который предоставляет AI-ассистентам инструменты для работы с Apple Mail на macOS. Взаимодействие с Mail.app — через JXA (`osascript -l JavaScript`). Транспорт — stdio.
 
 Полная спецификация: [`SPEC.md`](./SPEC.md).
 
@@ -45,11 +45,36 @@ src/
 
 ### Ключевые соглашения
 
-- AppleScript-слой изолирован в `src/applescript/`. Tool-хендлеры не вызывают `osascript` напрямую — только через `runner.ts`.
-- Каждый `.applescript`-скрипт возвращает данные через `return` в виде JSON-строки (сериализация вручную внутри скрипта).
-- Ошибки AppleScript перехватываются в `runner.ts` и пробрасываются как `McpError`.
+- JXA-слой изолирован в `src/applescript/`. Tool-хендлеры не вызывают `osascript` напрямую — только через `runner.ts`.
+- Каждый JXA-скрипт возвращает данные через `return JSON.stringify(...)`. Параметры принимаются через `argv[0]` как JSON-строка.
+- Ошибки JXA перехватываются в `runner.ts` и пробрасываются как `McpError`.
 - Письма идентифицируются составным ID: `{account}::{mailbox}::{messageId}`.
 - Все tool-параметры `account` — опциональные; операции чтения без `account` охватывают все аккаунты.
+- Определение папок — через `mailbox-resolver.ts`: alias map (EN/RU) + regex fallback + in-memory кеш per account.
+
+## Git Flow
+
+Репозиторий использует git-flow. Ветки: `main` (production), `develop` (integration).
+
+Конфигурация: fast-forward merges (без merge-коммитов), ветки после merge удаляются.
+
+```bash
+git flow feature start <name>   # новая фича от develop
+git flow feature finish <name>  # fast-forward в develop, ветка удаляется
+
+git flow release start <version>   # релиз от develop (например: 0.1.0)
+git flow release finish <version>  # merge в main + тег vX.Y.Z, затем в develop
+
+git flow hotfix start <name>    # хотфикс от main
+git flow hotfix finish <name>   # merge в main + develop
+```
+
+После `finish` вручную запускать push:
+```bash
+git push origin develop
+git push origin main      # после release/hotfix
+git push origin --tags    # после release/hotfix
+```
 
 ## Claude Desktop Integration
 
