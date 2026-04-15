@@ -1,5 +1,6 @@
 // JXA script: move an email to another mailbox
 // argv[0]: JSON { id: string, targetMailbox: string }
+//   targetMailbox — real mailbox name (pre-resolved by TypeScript MailboxResolver when possible)
 // Returns: { success: true }
 function run(argv) {
   const params = JSON.parse(argv[0] || "{}");
@@ -17,11 +18,17 @@ function run(argv) {
     const accts = Mail.accounts().filter((a) => a.name() === account);
     if (accts.length === 0) throw new Error(`Account not found: ${account}`);
 
-    const mbs = accts[0].mailboxes().filter((mb) => mb.name() === targetMailbox);
-    if (mbs.length === 0) throw new Error(`Target mailbox not found: ${targetMailbox}`);
+    // Direct match first (TypeScript should have pre-resolved the name)
+    let mbs = accts[0].mailboxes().filter((mb) => mb.name() === targetMailbox);
+
+    if (mbs.length === 0) {
+      throw new Error(
+        `Target mailbox "${targetMailbox}" not found in account "${account}". ` +
+        `Available: ${accts[0].mailboxes().map((mb) => mb.name()).join(", ")}`
+      );
+    }
 
     Mail.move(msg, { to: mbs[0] });
-
     return JSON.stringify({ success: true });
   } catch (e) {
     throw new Error("move-email failed: " + (e.message || e));

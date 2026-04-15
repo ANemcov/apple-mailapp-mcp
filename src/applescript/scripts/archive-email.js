@@ -1,9 +1,11 @@
-// JXA script: archive an email (move to Archive mailbox)
-// argv[0]: JSON { id: string }
+// JXA script: move email to the Archive mailbox
+// argv[0]: JSON { id: string, archiveMailbox: string }
+//   archiveMailbox — real mailbox name, pre-resolved by TypeScript MailboxResolver
 // Returns: { success: true }
 function run(argv) {
   const params = JSON.parse(argv[0] || "{}");
   if (!params.id) throw new Error("id is required");
+  if (!params.archiveMailbox) throw new Error("archiveMailbox is required");
 
   const Mail = Application("Mail");
 
@@ -14,28 +16,16 @@ function run(argv) {
     const accts = Mail.accounts().filter((a) => a.name() === account);
     if (accts.length === 0) throw new Error(`Account not found: ${account}`);
 
-    // Find Archive mailbox — name varies by provider (Archive, [Gmail]/All Mail, etc.)
-    const archiveNames = ["Archive", "All Mail", "[Gmail]/All Mail", "Archived"];
-    let archiveMb = null;
-
-    const allMbs = accts[0].mailboxes();
-    for (const name of archiveNames) {
-      const found = allMbs.filter((mb) => mb.name() === name);
-      if (found.length > 0) {
-        archiveMb = found[0];
-        break;
-      }
-    }
-
-    if (!archiveMb) {
+    const mbs = accts[0].mailboxes().filter((mb) => mb.name() === params.archiveMailbox);
+    if (mbs.length === 0) {
+      const available = accts[0].mailboxes().map((mb) => mb.name()).join(", ");
       throw new Error(
-        `Archive mailbox not found for account "${account}". ` +
-        `Available mailboxes: ${allMbs.map((mb) => mb.name()).join(", ")}`
+        `Archive mailbox "${params.archiveMailbox}" not found in account "${account}". ` +
+        `Available: ${available}`
       );
     }
 
-    Mail.move(msg, { to: archiveMb });
-
+    Mail.move(msg, { to: mbs[0] });
     return JSON.stringify({ success: true });
   } catch (e) {
     throw new Error("archive-email failed: " + (e.message || e));

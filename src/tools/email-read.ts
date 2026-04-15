@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runScript } from "../applescript/runner.js";
+import { mailboxResolver } from "../applescript/mailbox-resolver.js";
 import type { EmailSummary, EmailDetail } from "../types.js";
 
 export function registerEmailReadTools(server: McpServer): void {
@@ -15,9 +16,18 @@ export function registerEmailReadTools(server: McpServer): void {
     },
     async ({ account, mailbox, limit, unread_only }) => {
       try {
+        const requestedMailbox = mailbox ?? "INBOX";
+        // Resolve canonical mailbox name per account (supports multi-account iteration inside the script)
+        // Pass resolved name only when a single account is specified; otherwise pass as-is and
+        // let list-emails.js resolve per-account using the same logic via discover-mailboxes.
+        let resolvedMailbox = requestedMailbox;
+        if (account) {
+          resolvedMailbox = await mailboxResolver.resolve(account, requestedMailbox);
+        }
+
         const emails = await runScript<EmailSummary[]>("list-emails", {
           account: account ?? "",
-          mailbox: mailbox ?? "INBOX",
+          mailbox: resolvedMailbox,
           limit: limit ?? 20,
           unreadOnly: unread_only ?? false,
         });

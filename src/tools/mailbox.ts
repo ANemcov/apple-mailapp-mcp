@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runScript } from "../applescript/runner.js";
+import { mailboxResolver } from "../applescript/mailbox-resolver.js";
 import type { AccountInfo, MailboxInfo } from "../types.js";
 
 export function registerMailboxTools(server: McpServer): void {
@@ -45,7 +46,9 @@ export function registerMailboxTools(server: McpServer): void {
     },
     async ({ id, target_mailbox }) => {
       try {
-        await runScript("move-email", { id, targetMailbox: target_mailbox });
+        const account = id.substring(0, id.indexOf("::"));
+        const resolvedTarget = await mailboxResolver.resolve(account, target_mailbox);
+        await runScript("move-email", { id, targetMailbox: resolvedTarget });
         return { content: [{ type: "text", text: "Email moved successfully." }] };
       } catch (error) {
         return { content: [{ type: "text", text: String(error) }], isError: true };
@@ -94,7 +97,15 @@ export function registerMailboxTools(server: McpServer): void {
     },
     async ({ id }) => {
       try {
-        await runScript("archive-email", { id });
+        const account = id.substring(0, id.indexOf("::"));
+        const archiveMailbox = await mailboxResolver.resolveStrict(account, "ARCHIVE");
+        if (!archiveMailbox) {
+          return {
+            content: [{ type: "text", text: `Archive mailbox not found for account "${account}".` }],
+            isError: true,
+          };
+        }
+        await runScript("archive-email", { id, archiveMailbox });
         return { content: [{ type: "text", text: "Email archived." }] };
       } catch (error) {
         return { content: [{ type: "text", text: String(error) }], isError: true };
