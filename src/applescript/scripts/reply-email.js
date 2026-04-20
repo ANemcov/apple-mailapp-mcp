@@ -11,11 +11,52 @@ function run(argv) {
   const Mail = Application("Mail");
 
   try {
+    const { account: accountName } = parseCompositeId(id);
     const msg = findMessage(Mail, id);
-    const reply = Mail.reply(msg, { replyToAll: replyAll });
 
-    // Prepend body before quoted original
-    reply.content = body + "\n\n" + (reply.content() || "");
+    const originalSubject = msg.subject() || "";
+    const replySubject = /^re:/i.test(originalSubject)
+      ? originalSubject
+      : "Re: " + originalSubject;
+
+    // Resolve sender address from the account
+    let senderAddress = "";
+    try {
+      const accts = Mail.accounts().filter((a) => a.name() === accountName);
+      if (accts.length > 0) {
+        const addrs = accts[0].emailAddresses();
+        senderAddress = Array.isArray(addrs) ? addrs[0] || "" : String(addrs);
+      }
+    } catch (_) {}
+
+    // Collect recipient addresses
+    const toAddresses = [extractEmail(msg.sender())];
+    if (replyAll) {
+      msg.toRecipients().forEach(function (r) {
+        try {
+          const addr = extractEmail(r.address());
+          if (addr && !toAddresses.includes(addr)) toAddresses.push(addr);
+        } catch (_) {}
+      });
+      msg.ccRecipients().forEach(function (r) {
+        try {
+          const addr = extractEmail(r.address());
+          if (addr && !toAddresses.includes(addr)) toAddresses.push(addr);
+        } catch (_) {}
+      });
+    }
+
+    // Create OutgoingMessage with content set at construction time —
+    // post-creation property assignment via JXA ObjectSpecifier is silently ignored.
+    const msgProps = { subject: replySubject, content: body, visible: false };
+    if (senderAddress) msgProps.sender = senderAddress;
+    const reply = Mail.OutgoingMessage(msgProps);
+    Mail.outgoingMessages.push(reply);
+
+    for (const addr of toAddresses) {
+      reply.toRecipients.push(Mail.ToRecipient({ address: addr }));
+    }
+
     reply.send();
 
     return JSON.stringify({ success: true });
@@ -32,6 +73,12 @@ function parseCompositeId(id) {
     mailbox: id.substring(firstSep + 2, secondSep),
     messageId: id.substring(secondSep + 2),
   };
+}
+
+function extractEmail(str) {
+  if (!str) return str;
+  const match = str.match(/<([^>]+)>/);
+  return match ? match[1].trim() : str.trim();
 }
 
 function findMessage(Mail, compositeId) {
